@@ -11,6 +11,7 @@ from typing import List, Optional, Dict
 
 from flask import current_app, g
 from pymongo.collection import Collection
+from pymongo.command_cursor import CommandCursor
 from pymongo.cursor import Cursor
 from werkzeug.local import LocalProxy
 from pymongo import MongoClient, DESCENDING, ASCENDING
@@ -20,7 +21,6 @@ from pymongo.errors import DuplicateKeyError, OperationFailure
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 from pymongo.read_concern import ReadConcern
-
 
 def get_db() -> Database:
     """
@@ -91,7 +91,7 @@ def get_movies_by_country(countries: List) -> Optional[List]:
         return e
 
 
-def get_movies_faceted(filters, page, movies_per_page):
+def get_movies_faceted(filters: Dict, page: int, movies_per_page: int) -> (Optional[List], Optional[List]):
     """
     Returns movies and runtime and ratings facets. Also returns the total
     movies matched by the filter.
@@ -160,6 +160,7 @@ def get_movies_faceted(filters, page, movies_per_page):
     # TODO: Faceted Search
     # Add the necessary stages to the pipeline variable in the correct order.
     # pipeline.extend(...)
+    pipeline.extend([skip_stage, limit_stage, facet_stage])
 
     try:
         movies = list(db.movies.aggregate(pipeline, allowDiskUse=True))[0]
@@ -223,9 +224,9 @@ def get_movies(filters: Dict, page: int, movies_per_page: int) -> (List, int):
     """
     query, sort, project = build_query_sort_project(filters)
     if project:
-        cursor = db.movies.find(query, project).sort(sort)
+        cursor: Cursor = db.movies.find(query, project).sort(sort)
     else:
-        cursor = db.movies.find(query).sort(sort)
+        cursor: Cursor = db.movies.find(query).sort(sort)
 
     total_num_movies = 0
     if page == 0:
@@ -243,12 +244,12 @@ def get_movies(filters: Dict, page: int, movies_per_page: int) -> (List, int):
 
     # TODO: Paging
     # Use the cursor to only return the movies that belong on the current page.
-    movies = cursor.limit(movies_per_page)
+    movies: Cursor = cursor.skip(page*movies_per_page).limit(movies_per_page)
 
-    return (list(movies), total_num_movies)
+    return list(movies), total_num_movies
 
 
-def get_movie(id):
+def get_movie(id) -> CommandCursor:
     """
     Given a movie ID, return a movie with that ID, with the comments for that
     movie embedded in the movie document. The comments are joined from the
@@ -276,7 +277,7 @@ def get_movie(id):
             }
         ]
 
-        movie = db.movies.aggregate(pipeline).next()
+        movie: CommandCursor = db.movies.aggregate(pipeline).next()
         return movie
 
     # TODO: Error Handling
@@ -391,16 +392,16 @@ to better understand the task.
 """
 
 
-def get_user(email):
+def get_user(email: str) -> Dict:
     """
     Given an email, returns a document from the `users` collection.
     """
     # TODO: User Management
     # Retrieve the user document corresponding with the user's email.
-    return db.users.find_one({"some_field": "some_value"})
+    return db.users.find_one({"email": email})
 
 
-def add_user(name, email, hashedpw):
+def add_user(name: str, email: str, hashedpw: str) -> Dict:
     """
     Given a name, email and password, inserts a document with those credentials
     to the `users` collection.
@@ -419,16 +420,16 @@ def add_user(name, email, hashedpw):
         # TODO: Durable Writes
         # Use a more durable Write Concern for this operation.
         db.users.insert_one({
-            "name": "mongo",
-            "email": "mongo@mongodb.com",
-            "password": "flibbertypazzle"
+            "name": name,
+            "email": email,
+            "password": hashedpw
         })
         return {"success": True}
     except DuplicateKeyError:
         return {"error": "A user with the given email already exists."}
 
 
-def login_user(email, jwt):
+def login_user(email: str, jwt: str) -> Dict:
     """
     Given an email and JWT, logs in a user by updating the JWT corresponding
     with that user's email in the `sessions` collection.
@@ -440,15 +441,15 @@ def login_user(email, jwt):
         # Use an UPSERT statement to update the "jwt" field in the document,
         # matching the "user_id" field with the email passed to this function.
         db.sessions.update_one(
-            {"some_field": "some_value"},
-            {"$set": {"some_other_field": "some_other_value"}}
+            {"user_id": email},
+            {"$set": {"jwt": jwt}}, upsert=True
         )
         return {"success": True}
     except Exception as e:
         return {"error": e}
 
 
-def logout_user(email):
+def logout_user(email: str) -> Dict:
     """
     Given a user's email, logs out that user by deleting their corresponding
     entry in the `sessions` collection.
@@ -458,13 +459,13 @@ def logout_user(email):
     try:
         # TODO: User Management
         # Delete the document in the `sessions` collection matching the email.
-        db.sessions.delete_one({"some_field": "some_value"})
+        db.sessions.delete_one({"user_id": email})
         return {"success": True}
     except Exception as e:
         return {"error": e}
 
 
-def get_user_session(email):
+def get_user_session(email: str) -> Dict:
     """
     Given a user's email, finds that user's session in `sessions`.
 
@@ -473,12 +474,12 @@ def get_user_session(email):
     try:
         # TODO: User Management
         # Retrieve the session document corresponding with the user's email.
-        return db.sessions.find_one({"some_field": "some_value"})
+        return db.sessions.find_one({"user_id": email})
     except Exception as e:
         return {"error": e}
 
 
-def delete_user(email):
+def delete_user(email: str) -> Optional[Dict]:
     """
     Given a user's email, deletes a user from the `users` collection and deletes
     that user's session from the `sessions` collection.
@@ -486,8 +487,8 @@ def delete_user(email):
     try:
         # TODO: User Management
         # Delete the corresponding documents from `users` and `sessions`.
-        db.sessions.delete_one({"some_field": "some_value"})
-        db.users.delete_one({"some_field": "some_value"})
+        db.sessions.delete_one({"user_id": email})
+        db.users.delete_one({"email": email})
         if get_user(email) is None:
             return {"success": True}
         else:
@@ -572,3 +573,13 @@ def get_configuration():
         return (db.client.max_pool_size, db.client.write_concern, role_info)
     except IndexError:
         return (db.client.max_pool_size, db.client.write_concern, {})
+
+
+if __name__ == "__main__":
+    from mflix.factory import create_app
+
+    app = create_app()
+
+    with app.app_context():
+        filter = {'cast': ['Tom Hanks']}
+        (movies0, results0) = get_movies(filter, 0, 20)
