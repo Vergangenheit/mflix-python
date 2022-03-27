@@ -7,7 +7,7 @@ docstrings with a short explanation of the task.
 
 Look out for TODO markers for additional help. Good luck!
 """
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
 from flask import current_app, g
 from pymongo.collection import Collection
@@ -19,8 +19,10 @@ from pymongo.write_concern import WriteConcern
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from bson.objectid import ObjectId
+from pymongo.results import UpdateResult
 from bson.errors import InvalidId
 from pymongo.read_concern import ReadConcern
+
 
 def get_db() -> Database:
     """
@@ -244,7 +246,7 @@ def get_movies(filters: Dict, page: int, movies_per_page: int) -> (List, int):
 
     # TODO: Paging
     # Use the cursor to only return the movies that belong on the current page.
-    movies: Cursor = cursor.skip(page*movies_per_page).limit(movies_per_page)
+    movies: Cursor = cursor.skip(page * movies_per_page).limit(movies_per_page)
 
     return list(movies), total_num_movies
 
@@ -419,7 +421,8 @@ def add_user(name: str, email: str, hashedpw: str) -> Dict:
         # Insert a user with the "name", "email", and "password" fields.
         # TODO: Durable Writes
         # Use a more durable Write Concern for this operation.
-        db.users.insert_one({
+        db.users.with_options()
+        db.users.with_options(write_concern=WriteConcern(w="majority")).insert_one({
             "name": name,
             "email": email,
             "password": hashedpw
@@ -497,7 +500,7 @@ def delete_user(email: str) -> Optional[Dict]:
         return {"error": e}
 
 
-def update_prefs(email, prefs):
+def update_prefs(email: str, prefs: Optional[Dict]) -> Union[UpdateResult, Dict]:
     """
     Given a user's email and a dictionary of preferences, update that user's
     preferences.
@@ -515,8 +518,8 @@ def update_prefs(email, prefs):
         # TODO: User preferences
         # Use the data in "prefs" to update the user's preferences.
         response = db.users.update_one(
-            {"some_field": "some_value"},
-            {"$set": {"some_other_field": "some_other_value"}}
+            {"email": email},
+            {"$set": {"preferences": prefs}}
         )
         if response.matched_count == 0:
             return {'error': 'no user found'}
