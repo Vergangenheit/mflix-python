@@ -251,7 +251,7 @@ def get_movies(filters: Dict, page: int, movies_per_page: int) -> (List, int):
     return list(movies), total_num_movies
 
 
-def get_movie(id) -> CommandCursor:
+def get_movie(id: Union[str, bytes]) -> Union[CommandCursor, Dict]:
     """
     Given a movie ID, return a movie with that ID, with the comments for that
     movie embedded in the movie document. The comments are joined from the
@@ -271,20 +271,40 @@ def get_movie(id) -> CommandCursor:
 
         # TODO: Get Comments
         # Implement the required pipeline.
-        pipeline = [
-            {
-                "$match": {
-                    "_id": ObjectId(id)
-                }
+        lookup = {
+            '$lookup': {
+                'from': 'comments',
+                'let': {
+                    'id': '$_id'
+                },
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$eq': [
+                                    '$movie_id', '$$id'
+                                ]
+                            }
+                        }
+                    }
+                ],
+                'as': 'comments'
             }
-        ]
-
+        }
+        sort_stage = {
+            "$sort": {"date": DESCENDING}
+        }
+        pipeline = [{
+            "$match": {
+                "_id": ObjectId(id)
+            }
+        }, lookup, sort_stage]
         movie: CommandCursor = db.movies.aggregate(pipeline).next()
         return movie
 
     # TODO: Error Handling
     # If an invalid ID is passed to `get_movie`, it should return None.
-    except (StopIteration) as _:
+    except StopIteration as _:
 
         """
         Ticket: Error Handling
