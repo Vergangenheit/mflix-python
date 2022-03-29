@@ -1,3 +1,5 @@
+from typing import Dict
+
 from flask import jsonify, Blueprint, make_response, request
 from mflix.db import get_user, add_user, login_user, make_admin, \
     logout_user, delete_user, update_prefs, most_active_commenters
@@ -50,7 +52,7 @@ CORS(user_api_v1)
 
 class User(object):
 
-    def __init__(self, userdata):
+    def __init__(self, userdata: Dict):
         self.email = userdata.get('email')
         self.name = userdata.get('name')
         self.password = userdata.get('password')

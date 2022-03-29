@@ -7,8 +7,8 @@ docstrings with a short explanation of the task.
 
 Look out for TODO markers for additional help. Good luck!
 """
+import datetime
 from typing import List, Optional, Dict, Union
-
 from flask import current_app, g
 from pymongo.collection import Collection
 from pymongo.command_cursor import CommandCursor
@@ -19,7 +19,7 @@ from pymongo.write_concern import WriteConcern
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from bson.objectid import ObjectId
-from pymongo.results import UpdateResult
+from pymongo.results import UpdateResult, InsertOneResult
 from bson.errors import InvalidId
 from pymongo.read_concern import ReadConcern
 
@@ -286,19 +286,22 @@ def get_movie(id: Union[str, bytes]) -> Union[CommandCursor, Dict]:
                                 ]
                             }
                         }
+                    },
+                    {
+                        "$sort": {'date': DESCENDING}
                     }
                 ],
                 'as': 'comments'
             }
         }
-        sort_stage = {
-            "$sort": {"date": DESCENDING}
-        }
+        # sort_stage = {
+        #     "$sort": {"date": DESCENDING}
+        # }
         pipeline = [{
             "$match": {
                 "_id": ObjectId(id)
             }
-        }, lookup, sort_stage]
+        }, lookup]
         movie: CommandCursor = db.movies.aggregate(pipeline).next()
         return movie
 
@@ -343,7 +346,7 @@ to better understand the task.
 """
 
 
-def add_comment(movie_id, user, comment, date):
+def add_comment(movie_id: str, user, comment: str, date: datetime.datetime) -> InsertOneResult:
     """
     Inserts a comment into the comments collection, with the following fields:
 
@@ -357,11 +360,11 @@ def add_comment(movie_id, user, comment, date):
     """
     # TODO: Create/Update Comments
     # Construct the comment document to be inserted into MongoDB.
-    comment_doc = {"some_field": "some_value"}
+    comment_doc = {"name": user.name, "email": user.email, "movie_id": movie_id, "text": comment, "date": date}
     return db.comments.insert_one(comment_doc)
 
 
-def update_comment(comment_id, user_email, text, date):
+def update_comment(comment_id: str, user_email: str, text: str, date: datetime.datetime) -> UpdateResult:
     """
     Updates the comment in the comment collection. Queries for the comment
     based by both comment _id field as well as the email field to doubly ensure
@@ -369,10 +372,11 @@ def update_comment(comment_id, user_email, text, date):
     """
     # TODO: Create/Update Comments
     # Use the user_email and comment_id to select the proper comment, then
+    com: Dict = db.comments.find_one({"email": user_email})
     # update the "text" and "date" of the selected comment.
-    response = db.comments.update_one(
-        {"some_field": "some_value"},
-        {"$set": {"some_other_field": "some_other_value"}}
+    response: UpdateResult = db.comments.update_one(
+        {"_id": com.get("_id")},
+        {"$set": {"text": text, "date": date}}
     )
 
     return response
