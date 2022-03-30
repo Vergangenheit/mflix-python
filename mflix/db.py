@@ -360,11 +360,11 @@ def add_comment(movie_id: str, user, comment: str, date: datetime.datetime) -> I
     """
     # TODO: Create/Update Comments
     # Construct the comment document to be inserted into MongoDB.
-    comment_doc = {"name": user.name, "email": user.email, "movie_id": movie_id, "text": comment, "date": date}
+    comment_doc = {"name": user.name, "email": user.email, "movie_id": ObjectId(movie_id), "text": comment, "date": date}
     return db.comments.insert_one(comment_doc)
 
 
-def update_comment(comment_id: str, user_email: str, text: str, date: datetime.datetime) -> UpdateResult:
+def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, text: str, date: datetime.datetime) -> Optional[UpdateResult]:
     """
     Updates the comment in the comment collection. Queries for the comment
     based by both comment _id field as well as the email field to doubly ensure
@@ -372,17 +372,27 @@ def update_comment(comment_id: str, user_email: str, text: str, date: datetime.d
     """
     # TODO: Create/Update Comments
     # Use the user_email and comment_id to select the proper comment, then
-    com: Dict = db.comments.find_one({"email": user_email})
-    # update the "text" and "date" of the selected comment.
-    response: UpdateResult = db.comments.update_one(
-        {"_id": com.get("_id")},
-        {"$set": {"text": text, "date": date}}
-    )
+    try:
+        if isinstance(comment_id, ObjectId):
+            com: Dict = db.comments.find_one({"email": user_email, "_id": comment_id})
+        elif isinstance(comment_id, str) and len(comment_id) == 24:
+            # check if string is proper
+            com: Dict = db.comments.find_one({"email": user_email, "_id": ObjectId(comment_id)})
+        elif isinstance(comment_id, bytes) and len(comment_id) == 12:
+            com: Dict = db.comments.find_one({"email": user_email, "_id": ObjectId(comment_id)})
+        else:
+            com: Dict = db.comments.find_one({"email": user_email})
+        # update the "text" and "date" of the selected comment.
+        response: UpdateResult = db.comments.update_one(
+            {"_id": com.get("_id")},
+            {"$set": {"text": text, "date": date}}
+        )
+        return response
+    except Exception as e:
+        raise TypeError
 
-    return response
 
-
-def delete_comment(comment_id, user_email):
+def delete_comment(comment_id: str, user_email: str):
     """
     Given a user's email and a comment ID, deletes a comment from the comments
     collection
