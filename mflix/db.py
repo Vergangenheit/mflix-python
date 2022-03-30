@@ -19,7 +19,7 @@ from pymongo.write_concern import WriteConcern
 from pymongo.database import Database
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from bson.objectid import ObjectId
-from pymongo.results import UpdateResult, InsertOneResult
+from pymongo.results import UpdateResult, InsertOneResult, DeleteResult
 from bson.errors import InvalidId
 from pymongo.read_concern import ReadConcern
 
@@ -392,7 +392,7 @@ def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, tex
         raise TypeError
 
 
-def delete_comment(comment_id: str, user_email: str):
+def delete_comment(comment_id: str, user_email: str) -> DeleteResult:
     """
     Given a user's email and a comment ID, deletes a comment from the comments
     collection
@@ -407,7 +407,7 @@ def delete_comment(comment_id: str, user_email: str):
 
     # TODO: Delete Comments
     # Use the user_email and comment_id to delete the proper comment.
-    response = db.comments.delete_one({"_id": ObjectId(comment_id)})
+    response: DeleteResult = db.comments.delete_one({"_id": ObjectId(comment_id)})
     return response
 
 
