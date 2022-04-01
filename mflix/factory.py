@@ -5,16 +5,16 @@ from flask.json import JSONEncoder
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
-
+from bson.son import SON
 from bson import json_util, ObjectId
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Union, List, Dict
 from mflix.api.movies import movies_api_v1
 from mflix.api.user import user_api_v1
 
 
 class MongoJsonEncoder(JSONEncoder):
-    def default(self, obj: Union[datetime, ObjectId]):
+    def default(self, obj: Union[datetime, ObjectId]) -> Union[str, SON, Dict, List]:
         if isinstance(obj, datetime):
             return obj.strftime("%Y-%m-%d %H:%M:%S")
         if isinstance(obj, ObjectId):
@@ -50,7 +50,7 @@ def create_app() -> Flask:
 
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
-    def serve(path):
+    def serve(path) -> str:
         return render_template('index.html')
 
     return app

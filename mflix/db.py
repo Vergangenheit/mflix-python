@@ -373,18 +373,10 @@ def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, tex
     # TODO: Create/Update Comments
     # Use the user_email and comment_id to select the proper comment, then
     try:
-        if isinstance(comment_id, ObjectId):
-            com: Dict = db.comments.find_one({"email": user_email, "_id": comment_id})
-        elif isinstance(comment_id, str) and len(comment_id) == 24:
-            # check if string is proper
-            com: Dict = db.comments.find_one({"email": user_email, "_id": ObjectId(comment_id)})
-        elif isinstance(comment_id, bytes) and len(comment_id) == 12:
-            com: Dict = db.comments.find_one({"email": user_email, "_id": ObjectId(comment_id)})
-        else:
-            com: Dict = db.comments.find_one({"email": user_email})
+        com: Dict = db.comments.find_one({"_id": comment_id})
         # update the "text" and "date" of the selected comment.
         response: UpdateResult = db.comments.update_one(
-            {"_id": com.get("_id")},
+            {"_id": comment_id, "email": user_email},
             {"$set": {"text": text, "date": date}}
         )
         return response
