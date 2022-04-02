@@ -364,7 +364,7 @@ def add_comment(movie_id: str, user, comment: str, date: datetime.datetime) -> I
     return db.comments.insert_one(comment_doc)
 
 
-def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, text: str, date: datetime.datetime) -> Optional[UpdateResult]:
+def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, text: str, date: datetime.datetime) -> UpdateResult:
     """
     Updates the comment in the comment collection. Queries for the comment
     based by both comment _id field as well as the email field to doubly ensure
@@ -372,16 +372,12 @@ def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, tex
     """
     # TODO: Create/Update Comments
     # Use the user_email and comment_id to select the proper comment, then
-    try:
-        com: Dict = db.comments.find_one({"_id": comment_id})
-        # update the "text" and "date" of the selected comment.
-        response: UpdateResult = db.comments.update_one(
-            {"_id": comment_id, "email": user_email},
-            {"$set": {"text": text, "date": date}}
-        )
-        return response
-    except Exception as e:
-        raise TypeError
+    # update the "text" and "date" of the selected comment.
+    response: UpdateResult = db.comments.update_one(
+        {"_id": comment_id, "email": user_email},
+        {"$set": {"text": text, "date": date}}
+    )
+    return response
 
 
 def delete_comment(comment_id: str, user_email: str) -> DeleteResult:
@@ -399,7 +395,7 @@ def delete_comment(comment_id: str, user_email: str) -> DeleteResult:
 
     # TODO: Delete Comments
     # Use the user_email and comment_id to delete the proper comment.
-    response: DeleteResult = db.comments.delete_one({"_id": ObjectId(comment_id)})
+    response: DeleteResult = db.comments.delete_one({"_id": ObjectId(comment_id), "email": user_email})
     return response
 
 
