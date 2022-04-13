@@ -360,11 +360,13 @@ def add_comment(movie_id: str, user, comment: str, date: datetime.datetime) -> I
     """
     # TODO: Create/Update Comments
     # Construct the comment document to be inserted into MongoDB.
-    comment_doc = {"name": user.name, "email": user.email, "movie_id": ObjectId(movie_id), "text": comment, "date": date}
+    comment_doc = {"name": user.name, "email": user.email, "movie_id": ObjectId(movie_id), "text": comment,
+                   "date": date}
     return db.comments.insert_one(comment_doc)
 
 
-def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, text: str, date: datetime.datetime) -> UpdateResult:
+def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, text: str,
+                   date: datetime.datetime) -> UpdateResult:
     """
     Updates the comment in the comment collection. Queries for the comment
     based by both comment _id field as well as the email field to doubly ensure
@@ -389,9 +391,6 @@ def update_comment(comment_id: Union[ObjectId, str, bytes], user_email: str, tex
         return response
 
 
-
-
-
 def delete_comment(comment_id: str, user_email: str) -> DeleteResult:
     """
     Given a user's email and a comment ID, deletes a comment from the comments
@@ -407,8 +406,12 @@ def delete_comment(comment_id: str, user_email: str) -> DeleteResult:
 
     # TODO: Delete Comments
     # Use the user_email and comment_id to delete the proper comment.
-    response: DeleteResult = db.comments.delete_one({"_id": ObjectId(comment_id)})
-    return response
+    if isinstance(comment_id, str):
+        response: DeleteResult = db.comments.delete_one({"_id": ObjectId(comment_id), "email": user_email})
+        return response
+    elif isinstance(comment_id, ObjectId):
+        response: DeleteResult = db.comments.delete_one({"_id": comment_id, "email": user_email})
+        return response
 
 
 """
