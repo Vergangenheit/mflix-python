@@ -566,7 +566,7 @@ def update_prefs(email: str, prefs: Optional[Dict]) -> Union[UpdateResult, Dict]
         return {'error': str(e)}
 
 
-def most_active_commenters():
+def most_active_commenters() -> List:
     """
     Returns a list of the top 20 most frequent commenters.
     """
@@ -582,12 +582,25 @@ def most_active_commenters():
     """
     # TODO: User Report
     # Return the 20 users who have commented the most on MFlix.
-    pipeline = []
+    group_stage = {
+        "$group": {
+            "_id":  "$email",
+            "count": {
+                "$count": {}
+            }
+        }
+    }
+    sort_stage = {
+        "$sort": {
+            "count": -1
+        }
+    }
+    pipeline = [group_stage, sort_stage]
 
-    rc = db.comments.read_concern  # you may want to change this read concern!
-    comments = db.comments.with_options(read_concern=rc)
-    result = comments.aggregate(pipeline)
-    return list(result)
+    rc: ReadConcern = db.comments.read_concern  # you may want to change this read concern!
+    comments: Collection = db.comments.with_options(read_concern=rc)
+    result: CommandCursor = comments.aggregate(pipeline)
+    return list(result)[:20]
 
 
 def make_admin(email):
