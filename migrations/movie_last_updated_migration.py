@@ -1,4 +1,6 @@
 from pymongo import MongoClient, UpdateOne
+from pymongo.cursor import Cursor
+from pymongo.database import Database
 from pymongo.errors import InvalidOperation
 from bson import ObjectId
 import dateutil.parser as parser
@@ -14,50 +16,56 @@ us. We just need to make sure the correct operations are sent to MongoDB!
 """
 
 # ensure you update your host information below!
-host = "mongodb://localhost:27017"
+host = "mongodb+srv://m220student:m220password@mflix.hqydc.mongodb.net/test"
 
 # don't update this information
 MFLIX_DB_NAME = "sample_mflix"
-mflix = MongoClient(host)[MFLIX_DB_NAME]
+mflix: Database = MongoClient(host)[MFLIX_DB_NAME]
 
-# TODO: Create the proper predicate and projection
-# add a predicate that checks that the "lastupdated" field exists, and then
-# checks that its type is a string
-# a projection is not required, but may help reduce the amount of data sent
-# over the wire!
-predicate = {"some_field": {"$some_operator": "some_expression"}}
-projection = None
 
-cursor = mflix.movies.find(predicate, projection)
+def migrate(mflix: Database):
+    # TODO: Create the proper predicate and projection
+    # add a predicate that checks that the "lastupdated" field exists, and then
+    # checks that its type is a string
+    # a projection is not required, but may help reduce the amount of data sent
+    # over the wire!
+    predicate = {"$and": [{"lastupdated": {"$exists": True}}, {"lastupdated": {"$type": "string"}}]}
+    projection = {"_id": 1, "lastupdated": 2}
 
-# this will transform the "lastupdated" field to an ISODate() from a string
-movies_to_migrate = []
-for doc in cursor:
-    doc_id = doc.get('_id')
-    lastupdated = doc.get('lastupdated', None)
-    movies_to_migrate.append(
-        {
-            "doc_id": ObjectId(doc_id),
-            "lastupdated": parser.parse(lastupdated)
-        }
-    )
+    cursor: Cursor = mflix.movies.find(predicate, projection)
 
-print(f"{len(movies_to_migrate)} documents to migrate")
+    # this will transform the "lastupdated" field to an ISODate() from a string
+    movies_to_migrate = []
+    for doc in cursor:
+        doc_id = doc.get('_id')
+        lastupdated = doc.get('lastupdated', None)
+        movies_to_migrate.append(
+            {
+                "doc_id": ObjectId(doc_id),
+                "lastupdated": parser.parse(lastupdated)
+            }
+        )
 
-try:
-    # TODO: Complete the UpdateOne statement below
-    # build the UpdateOne so it updates the "lastupdated" field to contain
-    # the new ISODate() type
-    bulk_updates = [UpdateOne(
-        {"_id": movie.get("doc_id")},
-        {"$some_update_operator": {"some_field_to_update"}}
-    ) for movie in movies_to_migrate]
+    print(f"{len(movies_to_migrate)} documents to migrate")
 
-    # here's where the bulk operation is sent to MongoDB
-    bulk_results = mflix.movies.bulk_write(bulk_updates)
-    print(f"{bulk_results.modified_count} documents updated")
+    try:
+        # TODO: Complete the UpdateOne statement below
+        # build the UpdateOne so it updates the "lastupdated" field to contain
+        # the new ISODate() type
+        bulk_updates = [UpdateOne(
+            {"_id": movie.get("doc_id")},
+            {"$set": {"lastupdated": movie.get("lastupdated")}}
+        ) for movie in movies_to_migrate]
 
-except InvalidOperation:
-    print("no updates necessary")
-except Exception as e:
-    print(str(e))
+        # here's where the bulk operation is sent to MongoDB
+        bulk_results = mflix.movies.bulk_write(bulk_updates)
+        print(f"{bulk_results.modified_count} documents updated")
+
+    except InvalidOperation:
+        print("no updates necessary")
+    except Exception as e:
+        print(str(e))
+
+
+if __name__ == "__main__":
+    migrate(mflix=mflix)
