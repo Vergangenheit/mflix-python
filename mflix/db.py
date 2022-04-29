@@ -9,6 +9,8 @@ Look out for TODO markers for additional help. Good luck!
 """
 import datetime
 from typing import List, Optional, Dict, Union
+
+import bson.errors
 from flask import current_app, g
 from pymongo.collection import Collection
 from pymongo.command_cursor import CommandCursor
@@ -308,7 +310,7 @@ def get_movie(id: Union[str, bytes]) -> Union[CommandCursor, Dict]:
 
     # TODO: Error Handling
     # If an invalid ID is passed to `get_movie`, it should return None.
-    except StopIteration as _:
+    except bson.errors.InvalidId:
 
         """
         Ticket: Error Handling
